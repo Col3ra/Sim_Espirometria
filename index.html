@@ -6,37 +6,18 @@
 <title>Simulador de Espirometría — Centro de Simulación</title>
 <style>
   :root{
-    --bg:#f6fafb;
-    --card:#ffffff;
-    --ink:#0b2230;
-    --muted:#5b6b76;
-    --grid:#e6edf1;
-    --accent:#005257;      /* espíritu rgb(0,82,87) */
-    --accent-2:#12b8a6;
-    --danger:#c9363c;
-    --warn:#b46a00;
-    --ok:#1b8553;
-    --radius:14px;
-    --shadow:0 10px 30px rgba(0,0,0,.07);
+    --bg:#f6fafb; --card:#ffffff; --ink:#0b2230; --muted:#5b6b76; --grid:#e6edf1;
+    --accent:#005257; --accent-2:#12b8a6; --danger:#c9363c; --warn:#b46a00;
+    --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.07);
   }
   html,body{height:100%}
-  body{
-    margin:0; background:var(--bg); color:var(--ink);
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
-    line-height:1.45;
-  }
-  .app{
-    display:grid; grid-template-columns: 340px 1fr;
-    gap:16px; padding:16px; height:100%; box-sizing:border-box;
-  }
-  .panel{
-    background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
-    padding:16px; display:flex; flex-direction:column; gap:12px; min-height:0;
-  }
-  .charts{
-    background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
-    padding:16px; display:grid; grid-template-rows:auto 1fr auto; gap:12px; min-height:0;
-  }
+  body{ margin:0; background:var(--bg); color:var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial; line-height:1.45;}
+  .app{ display:grid; grid-template-columns: 340px 1fr; gap:16px; padding:16px; height:100%; box-sizing:border-box; }
+  .panel{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:16px; display:flex; flex-direction:column; gap:12px; min-height:0; }
+  .charts{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:16px; display:grid; grid-template-rows:auto 1fr auto; gap:12px; min-height:0; }
   header{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
   h1{ font-size:18px; margin:0; font-weight:700; letter-spacing:.2px; }
   .controls{ display:grid; gap:10px; }
@@ -46,66 +27,44 @@
   }
   input[type="range"]{ width:100%; }
   .row-2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .row-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
   .btns{ display:flex; gap:8px; flex-wrap:wrap; }
-  button{
-    border:0; border-radius:10px; padding:10px 12px; font-weight:600; cursor:pointer;
-    background:var(--accent); color:#fff;
-  }
+  button{ border:0; border-radius:10px; padding:10px 12px; font-weight:600; cursor:pointer; background:var(--accent); color:#fff; }
   button.secondary{ background:#e9f3f2; color:var(--accent); }
   button.ghost{ background:transparent; border:1px solid var(--grid); color:var(--ink); }
   button.warn{ background:var(--warn); color:#fff; }
-  button.danger{ background:var(--danger); color:#fff; }
   button:disabled{ opacity:.6; cursor:not-allowed; }
-
   .metrics{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
-  .chip{
-    border:1px solid var(--grid); border-radius:12px; padding:10px;
-    display:flex; flex-direction:column; gap:2px; background:#fff;
-  }
+  .chip{ border:1px solid var(--grid); border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:2px; background:#fff; }
   .chip b{ font-size:16px; }
   .chip small{ color:var(--muted); font-weight:600; }
-
   .canvas-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; min-height:0; }
-  .plot{
-    position:relative; background:#fff; border:1px solid var(--grid);
-    border-radius:12px; padding:12px; min-height:280px; display:flex; flex-direction:column; gap:6px;
-  }
+  .plot{ position:relative; background:#fff; border:1px solid var(--grid); border-radius:12px; padding:12px; min-height:280px; display:flex; flex-direction:column; gap:6px; }
   .plot h3{ margin:0; font-size:14px; color:var(--muted); font-weight:700; }
   .plot canvas{ width:100%; height:100%; flex:1; }
-  .legend{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:12px; color:var(--muted); }
+  .legend{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; font-size:12px; color:var(--muted); }
   .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; background:var(--accent); }
   .dot2{ background:var(--accent-2); }
   .hint{ font-size:12px; color:var(--muted); }
   .foot{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .spacer{ flex:1 }
   .hidden{ display:none !important; }
+  .float-toggle{ position:fixed; top:12px; left:12px; z-index:5; background:#fff; border:1px solid var(--grid); color:var(--accent);
+    padding:8px 10px; border-radius:10px; box-shadow:var(--shadow); font-weight:700; }
 
-  /* Botón flotante cuando panel oculto */
-  .float-toggle{
-    position:fixed; top:12px; left:12px; z-index:5;
-    background:#fff; border:1px solid var(--grid); color:var(--accent);
-    padding:8px 10px; border-radius:10px; box-shadow:var(--shadow); font-weight:700;
-  }
-
-  /* Layout impresión (PDF) */
   @media print{
-    @page{ size:A4; margin:12mm; }
+    @page{ size:A4; margin:10mm; }
     body{ background:#fff; }
-    .app, .panel, .charts, .plot{ box-shadow:none; }
-    .panel, .float-toggle, #topBar{ display:none !important; }
+    .app, .panel, .float-toggle, #topBar{ display:none !important; }
     .report{ display:block !important; }
   }
-
-  /* responsive */
   @media (max-width: 980px){ .app{ grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
-  <!-- Botón flotante para restaurar panel cuando está oculto -->
   <button id="floatToggle" class="float-toggle hidden" title="Mostrar parámetros">Parámetros</button>
 
   <div class="app" id="app">
-    <!-- PANEL -->
     <aside class="panel" id="panel">
       <header>
         <h1>Simulador de Espirometría</h1>
@@ -116,44 +75,35 @@
 
       <div class="controls">
         <div class="row-2">
-          <div>
-            <label for="nombre">Paciente (simulado)</label>
-            <input id="nombre" type="text" placeholder="Apellido, Nombre" />
-          </div>
-          <div>
-            <label for="idpac">ID / DNI</label>
-            <input id="idpac" type="text" placeholder="Documento o ID" />
-          </div>
+          <div><label for="nombre">Paciente (simulado)</label><input id="nombre" type="text" placeholder="Apellido, Nombre" /></div>
+          <div><label for="idpac">ID / DNI</label><input id="idpac" type="text" placeholder="Documento o ID" /></div>
         </div>
 
-        <div>
-          <label for="pattern">Patrón</label>
-          <select id="pattern">
-            <option value="normal">Normal</option>
-            <option value="asma">Asma (obstructivo reversible)</option>
-            <option value="epoc">EPOC (obstructivo)</option>
-            <option value="enfisema">Enfisema</option>
-            <option value="restrictivo">Restrictivo</option>
-            <option value="mixto">Mixto (obstructivo + restrictivo)</option>
-          </select>
-        </div>
-
-        <div>
-          <label for="severity">Severidad (leve → severa)</label>
-          <input id="severity" type="range" min="0" max="100" value="30" />
+        <div class="row-3">
+          <div>
+            <label for="pattern">Patrón</label>
+            <select id="pattern">
+              <option value="normal">Normal</option>
+              <option value="asma">Asma (obstructivo reversible)</option>
+              <option value="epoc">EPOC (obstructivo)</option>
+              <option value="enfisema">Enfisema</option>
+              <option value="restrictivo">Restrictivo</option>
+              <option value="mixto">Mixto (obstructivo + restrictivo)</option>
+            </select>
+          </div>
+          <div>
+            <label for="severity">Severidad</label>
+            <input id="severity" type="range" min="0" max="100" value="30" />
+          </div>
+          <div style="display:flex;align-items:center;gap:8px; margin-top:6px;">
+            <input id="showTheo" type="checkbox" />
+            <label for="showTheo" style="margin:0;">Mostrar curva teórica</label>
+          </div>
         </div>
 
         <div class="row-2">
-          <div>
-            <label for="duracion">Duración maniobra (s)</label>
-            <input id="duracion" type="number" min="3" max="15" step="0.5" value="6" />
-          </div>
-          <div>
-            <label for="intento">Intento</label>
-            <select id="intento">
-              <option>1</option><option>2</option><option>3</option>
-            </select>
-          </div>
+          <div><label for="duracion">Duración maniobra (s)</label><input id="duracion" type="number" min="3" max="15" step="0.5" value="6" /></div>
+          <div><label for="intento">Intento</label><select id="intento"><option>1</option><option>2</option><option>3</option></select></div>
         </div>
 
         <div class="btns">
@@ -172,10 +122,7 @@
         <div class="chip"><small>Severidad</small><b id="m_sev">—</b></div>
       </div>
 
-      <p class="hint">
-        Docencia: en **restrictivo** la FVC baja con relación FEV1/FVC normal/alta; en **obstructivo** la FEV1 cae, el
-        PEF disminuye y la curva F-V muestra concavidad espirada.
-      </p>
+      <p class="hint">Tip docente: activá la teórica solo para explicar el “objetivo”. En práctica real, dejala oculta.</p>
 
       <div class="btns">
         <button id="fsBtn" class="secondary">Pantalla completa</button>
@@ -183,12 +130,11 @@
       </div>
     </aside>
 
-    <!-- ZONA DE GRÁFICOS -->
     <section class="charts" id="charts">
       <div class="foot" id="topBar">
         <div class="legend">
           <span class="dot"></span> Ensayo en curso
-          <span class="dot dot2"></span> Curva teórica
+          <span class="dot dot2" id="theoLegend" style="display:none;"></span> <span id="theoTxt" style="display:none;">Curva teórica</span>
         </div>
         <div class="spacer"></div>
         <span class="hint" id="axisHint">Intervalo: 0–6 s · Volumen 0–6 L · Flujo −2 a 12 L/s</span>
@@ -206,33 +152,26 @@
       </div>
 
       <div class="foot">
-        <span class="hint">Consejo: repetí 3 intentos y compará reproducibilidad de FVC y FEV1.</span>
+        <span class="hint">Recomendado: 3 intentos aceptables y reproducibles.</span>
         <div class="spacer"></div>
         <span class="hint" id="status">Listo</span>
       </div>
     </section>
   </div>
 
-  <!-- SECCIÓN DE REPORTE PARA IMPRESIÓN -->
-  <section id="report" class="report hidden">
-    <div id="reportContent"></div>
-  </section>
+  <section id="report" class="report hidden"><div id="reportContent"></div></section>
 
 <script>
-/* ===================== UTILIDADES ===================== */
-const $ = (id)=>document.getElementById(id);
+/* ===== Utilidades ===== */
+const $ = id => document.getElementById(id);
 const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
 const fmt = (x, d=2)=> (isFinite(x)? (+x).toFixed(d) : "—");
+function lerp(a,b,t){ return a+(b-a)*t; }
 
-/* Escalas dinámicas: tMax se ajusta por patrón/severidad y por input manual */
-let AXIS = {
-  tMax: 6,     // segundos (dinámico)
-  vMax: 6,     // litros (fijo razonable para adultos)
-  flowMin: -2, // L/s
-  flowMax: 12  // L/s
-};
+/* ===== Ejes dinámicos ===== */
+let AXIS = { tMax:6, vMax:6, flowMin:-2, flowMax:12 };
 
-/* ===================== PATRONES ===================== */
+/* ===== Patrones ===== */
 const PATTERNS = {
   normal:     { label:"Normal",       FVC:4.8, k:2.6,  PEF:9.0,  concavity:0.15, midFlow:3.5,  tMaxBase:6.0 },
   asma:       { label:"Asma",         FVC:4.6, k:1.2,  PEF:6.5,  concavity:0.45, midFlow:2.2,  tMaxBase:8.0 },
@@ -242,7 +181,6 @@ const PATTERNS = {
   mixto:      { label:"Mixto",        FVC:3.1, k:1.0,  PEF:5.2,  concavity:0.50, midFlow:1.9,  tMaxBase:9.0 }
 };
 
-/* Severidad ajusta FVC, k, PEF, concavidad; y también la duración tMax */
 function applySeverity(base, sev){
   const s = clamp(sev,0,100)/100;
   const FVC = base.FVC * lerp(1.0, (base===PATTERNS.restrictivo?0.45:0.6), s);
@@ -250,40 +188,28 @@ function applySeverity(base, sev){
   const PEF = base.PEF * lerp(1.0, 0.5, s);
   const concavity = lerp(base.concavity, base.concavity*1.15 + 0.1*s, 0.8);
   const midFlow = base.midFlow * lerp(1.0, 0.55, s);
-  // duración: obstructivos más severos → maniobra más larga (vaciado lento)
   const tMaxAuto = base.tMaxBase * lerp(1.0, 1.6, s);
   return {FVC,k,PEF,concavity,midFlow,tMaxAuto};
 }
-function lerp(a,b,t){ return a+(b-a)*t; }
 
-/* Modelo monoexponencial para V-T */
+/* ===== Modelo fisiológico ===== */
 function volumeAt(t, FVC, k){
   t = clamp(t,0,AXIS.tMax);
-  return FVC * (1 - Math.exp(-k * t / 1.0));
+  return FVC * (1 - Math.exp(-k * t));
 }
-
-/* Curva F-V con concavidad espirada */
-function fvCurve(FVC, PEF, concavity){
-  const pts = [];
-  const N = 220;
+/* Curva F-V teórica (opcional, para docencia) */
+function fvCurveTheo(FVC, PEF, concavity){
+  const pts = [], N=220;
   for(let i=0;i<=N;i++){
-    const x = i/N;           // 0..1 volumen espirado
-    const vol = FVC * x;
+    const x = i/N, vol = FVC*x;
     const decay = Math.exp(-3*x) * (1 - concavity*x) + (concavity*0.15*Math.pow(1-x,2));
     const flow = Math.max(0, PEF * clamp(decay, 0, 1));
-    pts.push({vol,flow});
-  }
-  // Inspiración (pequeña)
-  for(let i=0;i<=N;i++){
-    const x = i/N;
-    const vol = FVC * (1 - x);
-    const flow = - Math.min(2.0, 2.5*(1 - Math.cos(Math.PI*x))*0.5);
     pts.push({vol,flow});
   }
   return pts;
 }
 
-/* ======== CANVAS ======== */
+/* ===== Canvas & dibujo ===== */
 const vt = $("vt"), fv = $("fv");
 const dpr = window.devicePixelRatio||1;
 function resizeCanvas(cnv){
@@ -320,14 +246,17 @@ function fvToPx(ctx, vol, flow){
   return [x,y];
 }
 
-/* ======== ESTADO/ANIMACIÓN ======== */
-let running=false, t=0, current={}, targetFV=[];
-let intentoHist = {}; // guarda últimos intentos por patrón (para “comparar” si quisieras extender)
+/* ===== Estado & buffers de puntos reales ===== */
+let running=false, t=0, current={}, theoFV=[];
+const vtPoints=[]; // {t,v}
+const fvPoints=[]; // {vol,flow}
+function resetBuffers(){ vtPoints.length=0; fvPoints.length=0; }
 
+/* Métricas desde el modelo “base” (sirven como referencia de predicción y lectura) */
 function computeMetrics(FVC,k,PEF){
   const fev1 = volumeAt(1, FVC, k);
   const ratio = FVC>0 ? (fev1/FVC)*100 : 0;
-  // FEF25–75 aproximado
+  // FEF25–75
   const v25 = 0.25*FVC, v75 = 0.75*FVC;
   function timeForVol(target){
     let lo=0, hi=AXIS.tMax;
@@ -348,130 +277,131 @@ function updateMetricsUI(m){
   const ratioEl = $("m_ratio").parentElement;
   ratioEl.style.borderColor = (m.RATIO<70? "var(--danger)" : m.RATIO<75? "var(--warn)" : "var(--grid)");
 }
+
+/* Preparación del patrón */
 function preparePattern(){
   const base = PATTERNS[$("pattern").value];
   const sev  = +$("severity").value;
   current = applySeverity(base, sev);
-  // Duración: si el usuario no tocó el input recientemente, sincronizá con auto
   const durField = $("duracion");
   let dur = parseFloat(durField.value);
   if(!dur || dur<3 || dur>15){ dur = current.tMaxAuto; durField.value = dur.toFixed(1); }
   AXIS.tMax = clamp(dur,3,15);
-  targetFV = fvCurve(current.FVC, current.PEF, current.concavity);
+  theoFV = fvCurveTheo(current.FVC, current.PEF, current.concavity);
   updateMetricsUI(computeMetrics(current.FVC, current.k, current.PEF));
   $("axisHint").textContent = `Intervalo: 0–${AXIS.tMax}s · Volumen 0–${AXIS.vMax} L · Flujo ${AXIS.flowMin} a ${AXIS.flowMax} L/s`;
-  t = 0; drawAll(0);
+  t = 0; resetBuffers(); drawAll();
 }
 
-/* Dibujo progresivo “a medida que exhala” */
-function drawVT(ctx, time){
+/* Dibujo basado SOLO en puntos reales acumulados */
+function drawVTfromPoints(ctx){
   drawGrid(ctx,"vt");
   ctx.save(); ctx.scale(dpr,dpr);
-  // Curva teórica completa (tenue)
-  ctx.beginPath();
-  for(let i=0;i<=300;i++){
-    const tt = AXIS.tMax*i/300;
-    const v  = volumeAt(tt, current.FVC, current.k);
-    const [x,y] = vtToPx(ctx, tt, v);
-    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  // Teórica (opcional)
+  if($("showTheo").checked){
+    ctx.beginPath();
+    const N=300;
+    for(let i=0;i<=N;i++){
+      const tt = AXIS.tMax*i/N;
+      const v  = volumeAt(tt, current.FVC, current.k);
+      const [x,y] = vtToPx(ctx, tt, v);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
+    ctx.lineWidth = 2; ctx.globalAlpha=.45; ctx.stroke(); ctx.globalAlpha=1;
   }
-  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
-  ctx.lineWidth = 2; ctx.globalAlpha=.5; ctx.stroke(); ctx.globalAlpha=1;
-
-  // Curva en tiempo real hasta “time”
-  const steps = Math.max(1, Math.floor((time/AXIS.tMax)*300));
-  ctx.beginPath();
-  for(let i=0;i<=steps;i++){
-    const tt = AXIS.tMax*i/300;
-    const v  = volumeAt(tt, current.FVC, current.k);
-    const [x,y] = vtToPx(ctx, tt, v);
-    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  // Real
+  if(vtPoints.length){
+    ctx.beginPath();
+    vtPoints.forEach((p,i)=>{ const [x,y]=vtToPx(ctx, p.t, p.v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    ctx.lineWidth = 2.3; ctx.stroke();
+    // Cursor
+    const last = vtPoints[vtPoints.length-1]; const [cx,cy]=vtToPx(ctx,last.t,last.v);
+    ctx.fillStyle="#111"; ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2); ctx.fill();
   }
-  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-  ctx.lineWidth = 2.3; ctx.stroke();
-
-  // Cursor y puntos de referencia 1s y 6s si corresponde
-  const vNow = volumeAt(time, current.FVC, current.k);
-  const [cx,cy] = vtToPx(ctx, time, vNow);
-  ctx.fillStyle = "#111"; ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2); ctx.fill();
-
   ctx.restore();
 }
-function drawFV(ctx, time){
+function drawFVfromPoints(ctx){
   drawGrid(ctx,"fv");
   ctx.save(); ctx.scale(dpr,dpr);
-  // Curva teórica completa
-  ctx.beginPath();
-  targetFV.forEach((p,i)=>{
-    const [x,y] = fvToPx(ctx, p.vol, p.flow);
-    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-  });
-  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
-  ctx.lineWidth = 2; ctx.globalAlpha=.6; ctx.stroke(); ctx.globalAlpha=1;
-
-  // Curva progresiva espirada hasta el volumen actual
-  const volNow = volumeAt(time, current.FVC, current.k);
-  const N = 200;
-  ctx.beginPath();
-  for(let i=0;i<=N;i++){
-    const x = i/N;
-    const vol = current.FVC * x;
-    if(vol>volNow) break;
-    const decay = Math.exp(-3*x) * (1 - current.concavity*x) + (current.concavity*0.15*Math.pow(1-x,2));
-    const flow = Math.max(0, current.PEF * clamp(decay,0,1));
-    const [px,py] = fvToPx(ctx, vol, flow);
-    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  // Teórica (opcional)
+  if($("showTheo").checked && theoFV.length){
+    ctx.beginPath();
+    theoFV.forEach((p,i)=>{ const [x,y]=fvToPx(ctx,p.vol,p.flow); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
+    ctx.lineWidth = 2; ctx.globalAlpha=.45; ctx.stroke(); ctx.globalAlpha=1;
   }
-  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-  ctx.lineWidth = 2.3; ctx.stroke();
-
-  // Cursor
-  const xFrac = clamp(volNow/current.FVC, 0, 1);
-  const decay = Math.exp(-3*xFrac) * (1 - current.concavity*xFrac) + (current.concavity*0.15*Math.pow(1-xFrac,2));
-  const flow = Math.max(0, current.PEF * clamp(decay,0,1));
-  const [cx,cy] = fvToPx(ctx, volNow, flow);
-  ctx.fillStyle="#111"; ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2); ctx.fill();
-
+  // Real
+  if(fvPoints.length){
+    ctx.beginPath();
+    fvPoints.forEach((p,i)=>{ const [x,y]=fvToPx(ctx,p.vol,p.flow); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    ctx.lineWidth = 2.3; ctx.stroke();
+    const last = fvPoints[fvPoints.length-1]; const [cx,cy]=fvToPx(ctx,last.vol,last.flow);
+    ctx.fillStyle="#111"; ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2); ctx.fill();
+  }
   ctx.restore();
 }
-function drawAll(time){
+function drawAll(){
   const vtc = vt.getContext('2d'), fvc = fv.getContext('2d');
   resizeCanvas(vt); resizeCanvas(fv);
-  drawVT(vtc, time);
-  drawFV(fvc, time);
+  drawVTfromPoints(vtc);
+  drawFVfromPoints(fvc);
 }
 
-/* ======== CONTROLES/LOOP ======== */
+/* ===== Loop y muestreo real ===== */
+let lastV = 0, lastT = 0;
 function loop(){
   if(!running) return;
-  // simulamos un esfuerzo real: avance no lineal (rápido al inicio)
   const dt = 1/60;
-  // mapeo para que “se sienta” más rápido al comienzo y más lento al final
   const progress = clamp(t/AXIS.tMax, 0, 1);
-  const speedFactor = 0.55 + 1.2*Math.exp(-3.2*progress); // cae con el tiempo
-  t += dt * speedFactor;
-  if(t>AXIS.tMax){ t=AXIS.tMax; running=false; $("status").textContent="Maniobra completa"; }
-  drawAll(t);
+  const speedFactor = 0.55 + 1.2*Math.exp(-3.2*progress); // rápido al inicio
+  const step = dt * speedFactor;
+
+  t = clamp(t + step, 0, AXIS.tMax);
+  const v = volumeAt(t, current.FVC, current.k);
+  vtPoints.push({ t, v });
+
+  // Flujo espiratorio = dV/dt (L/s), derivamos sobre el tiempo real de simulación:
+  const dV = v - lastV; const dT = Math.max(1e-3, t - lastT);
+  let flow = dV / dT; // L/s
+  if(flow < 0) flow = 0; // nos quedamos con espiración
+  fvPoints.push({ vol: v, flow });
+
+  lastV = v; lastT = t;
+
+  drawAll();
+
+  if(t >= AXIS.tMax){ running=false; $("status").textContent="Maniobra completa"; }
   if(running) requestAnimationFrame(loop);
 }
 
+/* ===== Controles ===== */
 $("startBtn").addEventListener("click", ()=>{
-  if(!running){ running=true; $("status").textContent="Grabando…"; requestAnimationFrame(loop); }
+  if(!running){
+    // reinicia buffers si estaba en t=0 (nuevo intento)
+    if(t===0){ resetBuffers(); lastV=0; lastT=0; }
+    running=true; $("status").textContent="Grabando…"; requestAnimationFrame(loop);
+  }
 });
 $("pauseBtn").addEventListener("click", ()=>{ running=false; $("status").textContent="Pausado"; });
-$("resetBtn").addEventListener("click", ()=>{
-  running=false; t=0; $("status").textContent="Listo"; drawAll(0);
-});
+$("resetBtn").addEventListener("click", ()=>{ running=false; t=0; lastV=0; lastT=0; resetBuffers(); $("status").textContent="Listo"; drawAll(); });
 
 $("pattern").addEventListener("change", preparePattern);
 $("severity").addEventListener("input", preparePattern);
 $("duracion").addEventListener("change", ()=>{
   AXIS.tMax = clamp(parseFloat($("duracion").value)||6, 3, 15);
   $("axisHint").textContent = `Intervalo: 0–${AXIS.tMax}s · Volumen 0–${AXIS.vMax} L · Flujo ${AXIS.flowMin} a ${AXIS.flowMax} L/s`;
-  t=0; drawAll(0);
+  t=0; lastV=0; lastT=0; resetBuffers(); drawAll();
+});
+$("showTheo").addEventListener("change", ()=>{
+  $("theoLegend").style.display = $("showTheo").checked? "inline-block":"none";
+  $("theoTxt").style.display = $("showTheo").checked? "inline":"none";
+  drawAll();
 });
 
-/* Ocultar/mostrar panel con botón flotante de retorno */
+/* Ocultar/mostrar panel */
 $("togglePanelBtn").addEventListener("click", ()=>{
   const panel = $("panel");
   const nowHidden = panel.classList.toggle("hidden");
@@ -490,27 +420,24 @@ $("fsBtn").addEventListener("click", ()=>{
   if(!document.fullscreenElement){ if(el.requestFullscreen) el.requestFullscreen(); }
   else{ if(document.exitFullscreen) document.exitFullscreen(); }
 });
-document.addEventListener("fullscreenchange", ()=> drawAll(t));
+document.addEventListener("fullscreenchange", ()=> drawAll());
 
-/* Inicialización */
-window.addEventListener("resize", ()=> drawAll(t));
+/* Init */
+window.addEventListener("resize", ()=> drawAll());
 preparePattern();
 
-/* ======== EXPORTAR PDF (impresión A4) ======== */
-$("pdfBtn").addEventListener("click", async ()=>{
-  // Render de alta resolución de las curvas actuales y completas
-  const vtURL_now = canvasToDataURL(vt);
-  const fvURL_now = canvasToDataURL(fv);
-  // También generamos imágenes “completas” al final de la maniobra para el informe
-  const snap = snapshotFullCurves();
-
-  // Construimos el HTML del reporte (A4) y disparamos print()
+/* ===== Exportación a PDF: 1 sola hoja ===== */
+$("pdfBtn").addEventListener("click", ()=>{
   const nombre = $("nombre").value||"—";
-  const idpac  = $("idpac").value||"—";
+  const idpac = $("idpac").value||"—";
   const patron = PATTERNS[$("pattern").value].label;
-  const sev    = $("severity").value;
-  const intento= $("intento").value;
+  const sev = $("severity").value;
+  const intento = $("intento").value;
   const m = computeMetrics(current.FVC, current.k, current.PEF);
+
+  // Render en offscreen con los PUNTOS REALES:
+  const vtImg = renderVTimage();
+  const fvImg = renderFVimage();
 
   const now = new Date();
   const fecha = now.toLocaleDateString();
@@ -519,17 +446,18 @@ $("pdfBtn").addEventListener("click", async ()=>{
   const report = `
   <style>
     body{ font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial; color:#0b2230; }
-    h2{ margin:0 0 6px 0; font-size:18px }
-    .header{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #e6edf1; padding-bottom:6px; margin-bottom:8px; }
+    .top{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #e6edf1; padding-bottom:6px; margin-bottom:8px; }
+    h2{ margin:0; font-size:18px }
     .tag{ font-weight:700; color:#005257 }
-    .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .box{ border:1px solid #e6edf1; border-radius:10px; padding:8px; }
     table{ width:100%; border-collapse:collapse; font-size:12px; }
     th,td{ border:1px solid #e6edf1; padding:6px; text-align:left; }
     .img{ width:100%; border:1px solid #e6edf1; border-radius:8px; }
     .foot{ margin-top:8px; font-size:11px; color:#5b6b76; display:flex; justify-content:space-between; }
+    @page{ size:A4; margin:10mm; }
   </style>
-  <div class="header">
+  <div class="top">
     <div>
       <h2>Informe de Espirometría</h2>
       <div class="tag">Centro de Simulación — Universidad</div>
@@ -537,9 +465,9 @@ $("pdfBtn").addEventListener("click", async ()=>{
     </div>
     <div>
       <table>
-        <tr><th>Paciente</th><td>${escapeHTML(nombre)}</td></tr>
-        <tr><th>ID/DNI</th><td>${escapeHTML(idpac)}</td></tr>
-        <tr><th>Patrón</th><td>${escapeHTML(patron)}</td></tr>
+        <tr><th>Paciente</th><td>${esc(nombre)}</td></tr>
+        <tr><th>ID/DNI</th><td>${esc(idpac)}</td></tr>
+        <tr><th>Patrón</th><td>${esc(patron)}</td></tr>
         <tr><th>Severidad</th><td>${sev}</td></tr>
         <tr><th>Duración</th><td>${AXIS.tMax}s</td></tr>
         <tr><th>Intento</th><td>${intento}</td></tr>
@@ -547,93 +475,97 @@ $("pdfBtn").addEventListener("click", async ()=>{
     </div>
   </div>
 
-  <div class="grid">
+  <div class="grid2">
     <div class="box">
       <h3>Volumen — Tiempo</h3>
-      <img class="img" src="${snap.vtFull}" alt="Volumen-Tiempo" />
+      <img class="img" src="${vtImg}" alt="Volumen-Tiempo" />
     </div>
     <div class="box">
       <h3>Flujo — Volumen</h3>
-      <img class="img" src="${snap.fvFull}" alt="Flujo-Volumen" />
+      <img class="img" src="${fvImg}" alt="Flujo-Volumen" />
     </div>
   </div>
 
-  <div class="grid" style="margin-top:10px;">
-    <div class="box">
-      <h3>Métricas</h3>
-      <table>
-        <tr><th>FVC (L)</th><td>${fmt(m.FVC)}</td><th>FEV1 (L)</th><td>${fmt(m.FEV1)}</td></tr>
-        <tr><th>FEV1/FVC (%)</th><td>${isFinite(m.RATIO)?Math.round(m.RATIO):"—"}</td><th>PEF (L/s)</th><td>${fmt(m.PEF)}</td></tr>
-        <tr><th>FEF25–75 (L/s)</th><td>${fmt(m.FEF)}</td><th></th><td></td></tr>
-      </table>
-    </div>
-    <div class="box">
-      <h3>Curvas de la maniobra (estado actual)</h3>
-      <div class="grid">
-        <img class="img" src="${vtURL_now}" alt="VT actual" />
-        <img class="img" src="${fvURL_now}" alt="FV actual" />
-      </div>
-    </div>
+  <div class="box" style="margin-top:10px;">
+    <h3>Métricas</h3>
+    <table>
+      <tr><th>FVC (L)</th><td>${fmt(m.FVC)}</td><th>FEV1 (L)</th><td>${fmt(m.FEV1)}</td></tr>
+      <tr><th>FEV1/FVC (%)</th><td>${isFinite(m.RATIO)?Math.round(m.RATIO):"—"}</td><th>PEF (L/s)</th><td>${fmt(m.PEF)}</td></tr>
+      <tr><th>FEF25–75 (L/s)</th><td>${fmt(m.FEF)}</td><th></th><td></td></tr>
+    </table>
   </div>
 
   <div class="foot">
-    <div>Equipo simulado: Web-Spiro v1.0 · Velocidad papel virtual: 10 mm/s (equivalente)</div>
+    <div>Equipo simulado: Web-Spiro v1.1 · Config: ${esc(patron)} (sev ${sev})</div>
     <div>Firma: ____________________________</div>
   </div>
   `;
 
   const w = window.open("", "_blank");
-  if(!w){ alert("Por favor habilitá las ventanas emergentes para exportar el PDF."); return; }
+  if(!w){ alert("Habilitá ventanas emergentes para exportar el PDF."); return; }
   w.document.open();
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Informe de Espirometría</title></head><body>${report}</body></html>`);
   w.document.close();
-  // Espera breve para que carguen las imágenes y dispara impresión
-  w.onload = ()=> setTimeout(()=> w.print(), 300);
+  w.onload = ()=> setTimeout(()=> w.print(), 250);
 });
 
-/* Helpers PDF */
-function canvasToDataURL(cnv){
-  // exporta a 2x para más nitidez
-  const rect = cnv.getBoundingClientRect();
-  const tmp = document.createElement("canvas");
-  tmp.width = Math.max(1200, Math.floor(rect.width*2));
-  tmp.height= Math.max(900,  Math.floor(rect.height*2));
-  const ctx = tmp.getContext("2d");
-  // Redibujamos la curva completa al final de la maniobra para este snapshot
-  const saveAxis = {...AXIS};
-  const saveDpr = window.devicePixelRatio;
-  const offCtx = { canvas: tmp };
-  // Dibujo específico según origen:
-  const isVT = (cnv.id==="vt");
-  // Preparamos contexto compatible con nuestras funciones
-  const _ctx = tmp.getContext("2d");
-  // Pintamos fondo
-  _ctx.fillStyle="#fff"; _ctx.fillRect(0,0,tmp.width,tmp.height);
-  // Reutilizamos nuestras funciones de plot: necesitamos adaptadores de grid
-  // Para no duplicar toda la lógica, llamamos a draw* sobre un canvas “simulado”
-  const backup = { width: cnv.width, height: cnv.height };
-  // Sobrescribimos dimensiones reales temporalmente
-  const origWidth = cnv.width, origHeight = cnv.height;
-  cnv.width = tmp.width; cnv.height = tmp.height;
-  const ctxReal = cnv.getContext("2d");
-  // Dibujamos curva completa
-  if(isVT) drawVT(ctxReal, AXIS.tMax); else drawFV(ctxReal, AXIS.tMax);
-  const url = cnv.toDataURL("image/png");
-  // Restauramos
-  cnv.width = origWidth; cnv.height = origHeight; drawAll(t);
-  return url;
+/* ===== Render offscreen desde PUNTOS REALES ===== */
+function makeOffscreen(w=1400,h=900){ const c=document.createElement("canvas"); c.width=w; c.height=h; return c; }
+function drawGridRaw(ctx, kind, w, h){
+  ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle="#e6edf1"; ctx.lineWidth=1;
+  const gx=8, gy=6;
+  for(let i=0;i<=gx;i++){ const x=w*i/gx; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+  for(let j=0;j<=gy;j++){ const y=h*j/gy; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+  ctx.fillStyle="#6b7a86"; ctx.font="16px system-ui";
+  if(kind==="vt"){ ctx.fillText("Tiempo (s)", w-110, h-10); ctx.fillText("Volumen (L)", 10, 20); }
+  else{ ctx.fillText("Volumen (L)", w-120, h-10); ctx.fillText("Flujo (L/s)", 10, 20); }
 }
-function snapshotFullCurves(){
-  // Guardamos el tiempo actual y dibujamos a tiempo final para capturas nítidas
-  const tPrev = t, runPrev = running;
-  running = false; t = AXIS.tMax; drawAll(t);
-  const vtFull = vt.toDataURL("image/png");
-  const fvFull = fv.toDataURL("image/png");
-  // Restauramos estado
-  t = tPrev; drawAll(t); running = runPrev;
-  return { vtFull, fvFull };
+function vtPxRaw(w,h,t,v){ const x=(t/AXIS.tMax)*(w-24)+18; const y=h-18-(v/AXIS.vMax)*(h-36); return [x,y]; }
+function fvPxRaw(w,h,vol,flow){
+  const x=(vol/AXIS.vMax)*(w-24)+18;
+  const y = h/2 - ((flow - (AXIS.flowMin+AXIS.flowMax)/2)/(AXIS.flowMax-AXIS.flowMin))*(h-36);
+  return [x,y];
 }
-function escapeHTML(s){ return String(s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m])); }
+function renderVTimage(){
+  const off = makeOffscreen(1280,880), ctx=off.getContext("2d");
+  drawGridRaw(ctx,"vt", off.width, off.height);
+  // Teórica opcional en PDF solo si está visible en UI
+  if($("showTheo").checked){
+    ctx.beginPath();
+    const N=320;
+    for(let i=0;i<=N;i++){
+      const tt=AXIS.tMax*i/N, v=volumeAt(tt,current.FVC,current.k);
+      const [x,y]=vtPxRaw(off.width,off.height,tt,v);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle="#12b8a6"; ctx.globalAlpha=.45; ctx.lineWidth=3; ctx.stroke(); ctx.globalAlpha=1;
+  }
+  if(vtPoints.length){
+    ctx.beginPath();
+    vtPoints.forEach((p,i)=>{ const [x,y]=vtPxRaw(off.width,off.height,p.t,p.v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.strokeStyle="#005257"; ctx.lineWidth=4; ctx.stroke();
+  }
+  return off.toDataURL("image/png");
+}
+function renderFVimage(){
+  const off = makeOffscreen(1280,880), ctx=off.getContext("2d");
+  drawGridRaw(ctx,"fv", off.width, off.height);
+  if($("showTheo").checked && theoFV.length){
+    ctx.beginPath();
+    theoFV.forEach((p,i)=>{ const [x,y]=fvPxRaw(off.width,off.height,p.vol,p.flow); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.strokeStyle="#12b8a6"; ctx.globalAlpha=.45; ctx.lineWidth=3; ctx.stroke(); ctx.globalAlpha=1;
+  }
+  if(fvPoints.length){
+    ctx.beginPath();
+    fvPoints.forEach((p,i)=>{ const [x,y]=fvPxRaw(off.width,off.height,p.vol,p.flow); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.strokeStyle="#005257"; ctx.lineWidth=4; ctx.stroke();
+  }
+  return off.toDataURL("image/png");
+}
+
+/* ===== Helpers ===== */
+function esc(s){ return String(s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m])); }
 </script>
 </body>
 </html>
