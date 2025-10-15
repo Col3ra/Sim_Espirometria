@@ -62,7 +62,7 @@
   .control-dock .ghost{ background:#fff; }
   .control-dock .sep{ width:1px; background:var(--grid); margin:0 2px; }
 
-  /* Tabs: subir especificidad para asegurar color activo */
+  /* Tabs: color activo visible en todos los navegadores */
   .tabs{ display:flex; gap:6px; }
   .tabs button{ background:#e9f3f2; color:var(--accent); }
   .tabs button.active,
@@ -394,7 +394,7 @@ function drawFEFLabels(ctx, FVC){
   });
 }
 
-/* Mejor intento de una lista (por FEV1) */
+/* Mejor intento (por FEV1) */
 function bestAttempt(list){
   if(!list.length) return null;
   return list.reduce((best,it)=> (it.metrics.FEV1>(best?.metrics?.FEV1||-1)? it:best), null);
@@ -451,9 +451,9 @@ function drawFVfromPoints(ctx){
     }
   }
 
-  /* Superposición PRE/POST: mostrar el mejor del otro modo en verde agua */
+  /* Superposición PRE/POST: mostrar el mejor del otro modo SOLO si hay curva actual */
   const other = (mode==='pre')? bestAttempt(attempts.post) : bestAttempt(attempts.pre);
-  if(other && other.fv && other.fv.length){
+  if(fvPoints.length && other && other.fv && other.fv.length){
     ctx.beginPath();
     other.fv.forEach((p,i)=>{ const [x,y]=fvToPx(ctx, p.vol, p.flow); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
     ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
@@ -582,7 +582,7 @@ $("dockReset").addEventListener("click", hardReset);
 $("saveBtn").addEventListener("click", saveAttempt);
 $("dockSave").addEventListener("click", saveAttempt);
 
-/* Tabs Pre/Post: aseguramos clases activas */
+/* Tabs Pre/Post */
 function setMode(newMode){
   mode=newMode;
   $("tabPre").classList.toggle("active", mode==='pre');
@@ -600,7 +600,7 @@ $("duracion").addEventListener("change", ()=>{ AXIS.tMax=clamp(parseFloat($("dur
 $("showTheo").addEventListener("change", ()=>{ $("theoLegend").style.display=$("showTheo").checked?"inline-block":"none"; $("theoTxt").style.display=$("showTheo").checked?"inline":"none"; drawAll(); });
 $("inclInsp").addEventListener("change", ()=> drawAll());
 
-/* Ocultar panel: ahora expande la grilla a ancho completo */
+/* Ocultar panel → ancho completo */
 $("togglePanelBtn").addEventListener("click", ()=>{
   const panel=$("panel"); const app=$("app");
   const nowHidden=panel.classList.toggle("hidden");
@@ -635,130 +635,146 @@ $("dockParams").addEventListener("click", ()=>{
 window.addEventListener("resize", ()=> drawAll());
 preparePattern(); updateUI();
 
-/* ===== Export PDF (1 hoja) con fallback si bloquean pop-ups ===== */
+/* ===== Export PDF robusto (espera imágenes, popup + fallback iframe) ===== */
 $("pdfBtn").addEventListener("click", ()=>{
-  const nombre=$("nombre").value||"—", idpac=$("idpac").value||"—";
-  const patron=PATTERNS[$("pattern").value].label, sev=$("severity").value;
-  const sexo=$("sexo").value, edad=+$("edad").value, talla=+$("talla").value;
-  const ref = gliRef();
-  const bestPreA  = bestAttempt(attempts.pre)  || {metrics:{FEV1:0,FVC:0}};
-  const bestPostA = bestAttempt(attempts.post) || {metrics:{FEV1:0,FVC:0}};
-  const bestPre  = {FEV1: +bestPreA.metrics.FEV1||0, FVC:+bestPreA.metrics.FVC||0};
-  const bestPost = {FEV1: +bestPostA.metrics.FEV1||0, FVC:+bestPostA.metrics.FVC||0};
-  const respBD = bronchoResponse(bestPre, bestPost);
+  try{
+    const nombre=$("nombre").value||"—", idpac=$("idpac").value||"—";
+    const patron=PATTERNS[$("pattern").value].label, sev=$("severity").value;
+    const sexo=$("sexo").value, edad=+$("edad").value, talla=+$("talla").value;
+    const ref = gliRef();
+    const bestPreA  = bestAttempt(attempts.pre)  || {metrics:{FEV1:0,FVC:0}};
+    const bestPostA = bestAttempt(attempts.post) || {metrics:{FEV1:0,FVC:0}};
+    const bestPre  = {FEV1: +bestPreA.metrics.FEV1||0, FVC:+bestPreA.metrics.FVC||0};
+    const bestPost = {FEV1: +bestPostA.metrics.FEV1||0, FVC:+bestPostA.metrics.FVC||0};
+    const respBD = bronchoResponse(bestPre, bestPost);
 
-  // imágenes: actual + overlay si existe "el otro"
-  const vtImg = renderVTimage(vtPoints);
-  const fvImg = renderFVimage(fvPoints, true); // true = incluir etiquetas FEF
-  const overlayOther = (mode==='pre')? bestPostA?.fv : bestPreA?.fv;
-  const fvOverlayImg = overlayOther && overlayOther.length ? renderFVimage(overlayOther, true, /*isOverlay*/true) : null;
+    // imágenes base (las actuales)
+    const vtImg = renderVTimage(vtPoints);
+    const fvImg = renderFVimage(fvPoints, true); // con etiquetas FEF
 
-  const now=new Date(); const fecha=now.toLocaleDateString(); const hora=now.toLocaleTimeString();
+    // overlay del "otro" modo (si existe)
+    const overlayOther = (mode==='pre')? bestPostA?.fv : bestPreA?.fv;
+    const fvOverlayImg = overlayOther && overlayOther.length ? renderFVimage(overlayOther, true, /*isOverlay*/true) : null;
 
-  const overlayHTML = fvOverlayImg ? `<div class="box"><h3>Flujo — Volumen (superposición PRE/POST)</h3>
-    <div style="position:relative;">
-      <img class="img" src="${fvOverlayImg}" alt="FV overlay" />
-      <img class="img" src="${fvImg}" alt="FV actual" style="position:absolute;left:0;top:0;opacity:.7"/>
-    </div></div>` : "";
+    const now=new Date(); const fecha=now.toLocaleDateString(); const hora=now.toLocaleTimeString();
 
-  const report = `
-  <style>
-    body{ font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial; color:#0b2230; }
-    .top{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #e6edf1; padding-bottom:6px; margin-bottom:8px; }
-    h2{ margin:0; font-size:18px } .tag{ font-weight:700; color:#005257 }
-    .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .box{ border:1px solid #e6edf1; border-radius:10px; padding:8px; }
-    table{ width:100%; border-collapse:collapse; font-size:12px; } th,td{ border:1px solid #e6edf1; padding:6px; text-align:left; }
-    .img{ width:100%; border:1px solid #e6edf1; border-radius:8px; }
-    .foot{ margin-top:8px; font-size:11px; color:#5b6b76; display:flex; justify-content:space-between; }
-    @page{ size:A4; margin:10mm; }
-  </style>
-  <div class="top">
-    <div>
-      <h2>Informe de Espirometría — Simulación</h2>
-      <div class="tag">Centro de Simulación — Universidad</div>
-      <div>Fecha: ${fecha} · Hora: ${hora}</div>
+    const overlayHTML = fvOverlayImg ? `<div class="box"><h3>Flujo — Volumen (superposición PRE/POST)</h3>
+      <div style="position:relative;">
+        <img class="img" src="${fvOverlayImg}" alt="FV overlay" />
+        <img class="img" src="${fvImg}" alt="FV actual" style="position:absolute;left:0;top:0;opacity:.7"/>
+      </div></div>` : "";
+
+    const report = `
+    <style>
+      body{ font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial; color:#0b2230; }
+      .top{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #e6edf1; padding-bottom:6px; margin-bottom:8px; }
+      h2{ margin:0; font-size:18px } .tag{ font-weight:700; color:#005257 }
+      .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+      .box{ border:1px solid #e6edf1; border-radius:10px; padding:8px; }
+      table{ width:100%; border-collapse:collapse; font-size:12px; } th,td{ border:1px solid #e6edf1; padding:6px; text-align:left; }
+      .img{ width:100%; border:1px solid #e6edf1; border-radius:8px; }
+      .foot{ margin-top:8px; font-size:11px; color:#5b6b76; display:flex; justify-content:space-between; }
+      @page{ size:A4; margin:10mm; }
+    </style>
+    <div class="top">
+      <div>
+        <h2>Informe de Espirometría — Simulación</h2>
+        <div class="tag">Centro de Simulación — Universidad</div>
+        <div>Fecha: ${fecha} · Hora: ${hora}</div>
+      </div>
+      <div>
+        <table>
+          <tr><th>Paciente</th><td>${esc(nombre)}</td></tr>
+          <tr><th>ID/DNI</th><td>${esc(idpac)}</td></tr>
+          <tr><th>Sexo / Edad / Talla</th><td>${sexo} · ${edad} a · ${talla} cm</td></tr>
+          <tr><th>Patrón</th><td>${esc(patron)}</td></tr>
+          <tr><th>Severidad</th><td>${sev}</td></tr>
+          <tr><th>Duración</th><td>${AXIS.tMax}s</td></tr>
+        </table>
+      </div>
     </div>
-    <div>
+
+    <div class="grid2">
+      <div class="box">
+        <h3>Volumen — Tiempo</h3>
+        <img class="img" src="${vtImg}" alt="Volumen-Tiempo" />
+      </div>
+      <div class="box">
+        <h3>Flujo — Volumen</h3>
+        <img class="img" src="${fvImg}" alt="Flujo-Volumen" />
+      </div>
+    </div>
+
+    ${overlayHTML}
+
+    <div class="box" style="margin-top:10px;">
+      <h3>Métricas y Referencia (GLI aprox.)</h3>
       <table>
-        <tr><th>Paciente</th><td>${esc(nombre)}</td></tr>
-        <tr><th>ID/DNI</th><td>${esc(idpac)}</td></tr>
-        <tr><th>Sexo / Edad / Talla</th><td>${sexo} · ${edad} a · ${talla} cm</td></tr>
-        <tr><th>Patrón</th><td>${esc(patron)}</td></tr>
-        <tr><th>Severidad</th><td>${sev}</td></tr>
-        <tr><th>Duración</th><td>${AXIS.tMax}s</td></tr>
+        <tr><th></th><th>FEV1 (L)</th><th>FVC (L)</th><th>FEV1/FVC (%)</th></tr>
+        <tr><td>Mejor PRE</td><td>${fmt(bestPre.FEV1)}</td><td>${fmt(bestPre.FVC)}</td><td>${pct(bestPre.FEV1/bestPre.FVC)}</td></tr>
+        <tr><td>Mejor POST</td><td>${fmt(bestPost.FEV1)}</td><td>${fmt(bestPost.FVC)}</td><td>${pct(bestPost.FEV1/bestPost.FVC)}</td></tr>
+        <tr><td>Predicho</td><td>${fmt(ref.predFEV1)}</td><td>${fmt(ref.predFVC)}</td><td>${pct(ref.predFEV1/ref.predFVC)}</td></tr>
+        <tr><td>LLN</td><td>${fmt(ref.llnFEV1)}</td><td>${fmt(ref.llnFVC)}</td><td>${pct(ref.llnRatio)}</td></tr>
       </table>
     </div>
-  </div>
 
-  <div class="grid2">
-    <div class="box">
-      <h3>Volumen — Tiempo</h3>
-      <img class="img" src="${vtImg}" alt="Volumen-Tiempo" />
+    <div class="grid2" style="margin-top:10px;">
+      <div class="box">
+        <h3>Aceptabilidad/Reproducibilidad (ATS/ERS)</h3>
+        <table>
+          <tr><th>Pre — aceptables</th><td>${countAcceptable(attempts.pre)}/3</td></tr>
+          <tr><th>Post — aceptables</th><td>${countAcceptable(attempts.post)}/3</td></tr>
+          <tr><th>Reproducibilidad PRE</th><td>${repStr(attempts.pre)}</td></tr>
+          <tr><th>Reproducibilidad POST</th><td>${repStr(attempts.post)}</td></tr>
+        </table>
+      </div>
+      <div class="box">
+        <h3>Respuesta broncodilatadora</h3>
+        <table>
+          <tr><th>FEV1</th><td>${deltaStr(bestPre.FEV1,bestPost.FEV1)}</td></tr>
+          <tr><th>FVC</th><td>${deltaStr(bestPre.FVC,bestPost.FVC)}</td></tr>
+          <tr><th>Conclusión</th><td><b>${respBD.ok ? "POSITIVA" : "Negativa"}</b> ${respBD.explain}</td></tr>
+        </table>
+      </div>
     </div>
-    <div class="box">
-      <h3>Flujo — Volumen</h3>
-      <img class="img" src="${fvImg}" alt="Flujo-Volumen" />
+
+    <div class="box" style="margin-top:10px;">
+      <h3>Interpretación</h3>
+      <div>${interpText(bestPre, ref)}</div>
     </div>
-  </div>
 
-  ${overlayHTML}
-
-  <div class="box" style="margin-top:10px;">
-    <h3>Métricas y Referencia (GLI aprox.)</h3>
-    <table>
-      <tr><th></th><th>FEV1 (L)</th><th>FVC (L)</th><th>FEV1/FVC (%)</th></tr>
-      <tr><td>Mejor PRE</td><td>${fmt(bestPre.FEV1)}</td><td>${fmt(bestPre.FVC)}</td><td>${pct(bestPre.FEV1/bestPre.FVC)}</td></tr>
-      <tr><td>Mejor POST</td><td>${fmt(bestPost.FEV1)}</td><td>${fmt(bestPost.FVC)}</td><td>${pct(bestPost.FEV1/bestPost.FVC)}</td></tr>
-      <tr><td>Predicho</td><td>${fmt(ref.predFEV1)}</td><td>${fmt(ref.predFVC)}</td><td>${pct(ref.predFEV1/ref.predFVC)}</td></tr>
-      <tr><td>LLN</td><td>${fmt(ref.llnFEV1)}</td><td>${fmt(ref.llnFVC)}</td><td>${pct(ref.llnRatio)}</td></tr>
-    </table>
-  </div>
-
-  <div class="grid2" style="margin-top:10px;">
-    <div class="box">
-      <h3>Aceptabilidad/Reproducibilidad (ATS/ERS)</h3>
-      <table>
-        <tr><th>Pre — aceptables</th><td>${countAcceptable(attempts.pre)}/3</td></tr>
-        <tr><th>Post — aceptables</th><td>${countAcceptable(attempts.post)}/3</td></tr>
-        <tr><th>Reproducibilidad PRE</th><td>${repStr(attempts.pre)}</td></tr>
-        <tr><th>Reproducibilidad POST</th><td>${repStr(attempts.post)}</td></tr>
-      </table>
+    <div class="foot">
+      <div>Equipo simulado: Web-Spiro v2.5 · Espera de imágenes para impresión · Overlay condicionado · GLI aprox (docente)</div>
+      <div>Firma: ____________________________</div>
     </div>
-    <div class="box">
-      <h3>Respuesta broncodilatadora</h3>
-      <table>
-        <tr><th>FEV1</th><td>${deltaStr(bestPre.FEV1,bestPost.FEV1)}</td></tr>
-        <tr><th>FVC</th><td>${deltaStr(bestPre.FVC,bestPost.FVC)}</td></tr>
-        <tr><th>Conclusión</th><td><b>${respBD.ok ? "POSITIVA" : "Negativa"}</b> ${respBD.explain}</td></tr>
-      </table>
-    </div>
-  </div>
 
-  <div class="box" style="margin-top:10px;">
-    <h3>Interpretación</h3>
-    <div>${interpText(bestPre, ref)}</div>
-  </div>
+    <script>
+      function allLoaded(){
+        const imgs = Array.from(document.images);
+        return Promise.all(imgs.map(img => img.complete ? Promise.resolve() :
+          new Promise(res => { img.onload=res; img.onerror=res; })));
+      }
+      allLoaded().then(()=>{ setTimeout(()=>{ window.focus(); window.print(); }, 150); });
+    </script>
+    `;
 
-  <div class="foot">
-    <div>Equipo simulado: Web-Spiro v2.4 · Superposición PRE/POST · FEF etiquetado · GLI aprox (docente)</div>
-    <div>Firma: ____________________________</div>
-  </div>
-  `;
-
-  // Pop-up estándar
-  let w=window.open("","_blank");
-  if(w){
-    w.document.open(); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Informe de Espirometría</title></head><body>${report}</body></html>`); w.document.close();
-    w.onload=()=> setTimeout(()=> w.print(), 250);
-  }else{
-    // Fallback: iframe oculto (por si el navegador bloquea pop-ups)
-    const iframe=document.createElement('iframe');
-    iframe.style.position='fixed'; iframe.style.right='0'; iframe.style.bottom='0'; iframe.style.width='0'; iframe.style.height='0'; iframe.style.border='0';
-    document.body.appendChild(iframe);
-    const doc = iframe.contentWindow.document;
-    doc.open(); doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>Informe de Espirometría</title></head><body>${report}</body></html>`); doc.close();
-    setTimeout(()=> iframe.contentWindow.focus() || iframe.contentWindow.print(), 300);
+    // Pop-up estándar
+    let w=window.open("", "_blank");
+    if(w){
+      w.document.open(); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Informe de Espirometría</title></head><body>${report}</body></html>`); w.document.close();
+    }else{
+      // Fallback: iframe oculto (si el navegador bloquea pop-ups)
+      const iframe=document.createElement('iframe');
+      iframe.style.position='fixed'; iframe.style.right='0'; iframe.style.bottom='0';
+      iframe.style.width='0'; iframe.style.height='0'; iframe.style.border='0';
+      document.body.appendChild(iframe);
+      const doc = iframe.contentWindow.document;
+      doc.open(); doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>Informe de Espirometría</title></head><body>${report}</body></html>`); doc.close();
+      setTimeout(()=> iframe.contentWindow && iframe.contentWindow.focus() && iframe.contentWindow.print(), 300);
+    }
+  }catch(err){
+    console.error("PDF error:", err);
+    alert("No se pudo generar el PDF. Revisá la consola del navegador para detalles.");
   }
 });
 
