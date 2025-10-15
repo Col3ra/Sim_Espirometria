@@ -13,7 +13,8 @@
   html,body{height:100%}
   body{ margin:0; background:var(--bg); color:var(--ink);
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial; line-height:1.45;}
-  .app{ display:grid; grid-template-columns: 360px 1fr; gap:16px; padding:16px; height:100%; box-sizing:border-box; }
+  .app{ display:grid; grid-template-columns: 360px 1fr; gap:16px; padding:16px; height:100%; box-sizing:border-box; transition: grid-template-columns .2s ease; }
+  .app.wide{ grid-template-columns: 1fr; } /* ocupa todo al ocultar panel */
   .panel{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
     padding:16px; display:flex; flex-direction:column; gap:12px; min-height:0; }
   .charts{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
@@ -48,19 +49,23 @@
   .foot{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .spacer{ flex:1 }
   .hidden{ display:none !important; }
-  .float-toggle{ position:fixed; top:12px; left:12px; z-index:5; background:#fff; border:1px solid var(--grid); color:var(--accent);
+  .float-toggle{ position:fixed; top:12px; left:12px; z-index:30; background:#fff; border:1px solid var(--grid); color:var(--accent);
     padding:8px 10px; border-radius:10px; box-shadow:var(--shadow); font-weight:700; }
-  .tabs{ display:flex; gap:6px; }
-  .tabs button{ background:#e9f3f2; color:var(--accent); }
-  .tabs button.active{ background:var(--accent); color:#fff; }
-  .pill{ padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; }
-  .pill.ok{ background:#e8f6ef; color:var(--ok); border:1px solid #cbe9d9; }
-  .pill.bad{ background:#fdeaea; color:var(--danger); border:1px solid #f6c1c1; }
+
+  /* Barra flotante de control: siempre visible (full screen también) */
+  .control-dock{
+    position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
+    z-index:40; background:#ffffffcc; backdrop-filter: blur(6px);
+    border:1px solid var(--grid); border-radius:14px; padding:8px;
+    display:flex; gap:8px; box-shadow:var(--shadow);
+  }
+  .control-dock .ghost{ background:#fff; }
+  .control-dock .sep{ width:1px; background:var(--grid); margin:0 2px; }
 
   @media print{
     @page{ size:A4; margin:10mm; }
     body{ background:#fff; }
-    .app, .panel, .float-toggle, #topBar{ display:none !important; }
+    .app, .panel, .float-toggle, #topBar, .control-dock{ display:none !important; }
     .report{ display:block !important; }
   }
   @media (max-width: 1000px){ .app{ grid-template-columns:1fr; } }
@@ -68,6 +73,18 @@
 </head>
 <body>
   <button id="floatToggle" class="float-toggle hidden" title="Mostrar parámetros">Parámetros</button>
+
+  <!-- Barra flotante de control (siempre visible) -->
+  <div class="control-dock" id="dock">
+    <button id="dockStart">Inicio</button>
+    <button id="dockPause" class="warn">Pausa</button>
+    <button id="dockSave" class="ok">Guardar intento</button>
+    <button id="dockReset" class="ghost">Reset</button>
+    <div class="sep"></div>
+    <button id="dockFS" class="secondary">Pantalla completa</button>
+    <button id="dockPDF" class="ghost">PDF</button>
+    <button id="dockParams" class="ghost">Parámetros</button>
+  </div>
 
   <div class="app" id="app">
     <aside class="panel" id="panel">
@@ -136,6 +153,7 @@
           </div>
         </div>
 
+        <!-- Botonera de la izquierda (opcional, la barra flotante ya controla todo) -->
         <div class="btns">
           <button id="startBtn">Inicio</button>
           <button id="pauseBtn" class="warn">Pausa</button>
@@ -243,9 +261,6 @@ function applySeverity(base, sev){
 
 /* ===== Modelo ===== */
 function volumeAt(t, FVC, k){ t = clamp(t,0,AXIS.tMax); return FVC * (1 - Math.exp(-k * t)); }
-
-/* Flujo espiratorio como función del fracción de volumen espirado (x=V/FVC).
-   Esto da PEF muy temprano y luego caída concava, y permite un ascenso vertical desde 0,0. */
 function flowExpFromFrac(x, PEF, concavity){
   x = clamp(x,0,1);
   const decay = Math.exp(-3*x) * (1 - concavity*x) + (concavity*0.15*Math.pow(1-x,2));
@@ -363,6 +378,17 @@ function drawArrow(ctx, x1,y1, x2,y2){
   ctx.lineTo(x2-len*Math.cos(ang+a), y2-len*Math.sin(ang+a));
   ctx.stroke();
 }
+let placeFEFLabels=false; // se activa cuando termina el intento
+function drawFEFLabels(ctx, FVC){
+  if(!placeFEFLabels) return;
+  const labels=["FEF 25%","FEF 50%","FEF 75%"];
+  [0.25,0.50,0.75].forEach((p,idx)=>{
+    const [x,y0]=fvToPx(ctx,p*FVC,0);
+    ctx.fillStyle="#4b5c66"; ctx.font="12px system-ui";
+    ctx.fillText(labels[idx], x+4, 16); // arriba de la línea
+  });
+}
+
 function drawVTfromPoints(ctx){
   drawGrid(ctx,"vt"); ctx.save(); ctx.scale(dpr,dpr);
   if($("showTheo").checked){
@@ -385,14 +411,16 @@ function drawVTfromPoints(ctx){
 function drawFVfromPoints(ctx){
   drawGrid(ctx,"fv"); ctx.save(); ctx.scale(dpr,dpr);
 
-  // Marcas FEF 25/50/75
   const FVC = vtPoints.length? vtPoints[vtPoints.length-1].v : current.FVC;
+
+  // Marcas FEF 25/50/75
   const vols = [0.25,0.50,0.75].map(p=>p*FVC);
   ctx.strokeStyle="#cfd8dc"; ctx.lineWidth=1; ctx.setLineDash([4,4]);
   vols.forEach(v=>{ const [x,_]=fvToPx(ctx,v,0); ctx.beginPath(); ctx.moveTo(x,10); ctx.lineTo(x,ctx.canvas.height/dpr-10); ctx.stroke(); });
   ctx.setLineDash([]);
+  drawFEFLabels(ctx, FVC);
 
-  // Curvas teóricas
+  // Curvas teóricas (incluye inspiración si está marcada)
   if($("showTheo").checked){
     // Espiratoria
     ctx.beginPath(); const N=220;
@@ -400,16 +428,16 @@ function drawFVfromPoints(ctx){
       const flow=flowExpFromFrac(x, current.PEF, current.concavity);
       const [px,py]=fvToPx(ctx,vol,flow); if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
     ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
-    ctx.lineWidth=2; ctx.globalAlpha=.45; ctx.stroke(); ctx.globalAlpha=1;
+    ctx.lineWidth=2; ctx.globalAlpha=.50; ctx.stroke(); ctx.globalAlpha=1;
 
-    // Inspiratoria
+    // Inspiratoria teórica visible si corresponde
     if($("inclInsp").checked){
       ctx.beginPath();
       for(let i=0;i<=N;i++){ const s=i/N; const vol=current.FVC*(1-s);
         const flow=current.PIF*Math.sin(Math.PI*s);
         const [px,py]=fvToPx(ctx,vol,flow); if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
       ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
-      ctx.lineWidth=2; ctx.globalAlpha=.30; ctx.stroke(); ctx.globalAlpha=1;
+      ctx.lineWidth=2; ctx.globalAlpha=.40; ctx.stroke(); ctx.globalAlpha=1;
     }
   }
 
@@ -441,15 +469,13 @@ function loop(){
     const speedFactor = 0.55 + 1.2*Math.exp(-3.2*progress);
     const step = dt*speedFactor;
 
-    // Al iniciar, fuerza el punto (0,0) para la subida vertical inicial
     if(t===0 && fvPoints.length===0){ fvPoints.push({vol:0, flow:0}); }
 
     t = clamp(t+step, 0, AXIS.tMax);
     const v = volumeAt(t, current.FVC, current.k);
     const xFrac = v / current.FVC;
-    const flow = flowExpFromFrac(xFrac, current.PEF, current.concavity); // flujo analítico (no derivada numérica)
+    const flow = flowExpFromFrac(xFrac, current.PEF, current.concavity);
 
-    // Guardar puntos
     vtPoints.push({t, v});
     fvPoints.push({vol:v, flow});
 
@@ -458,16 +484,16 @@ function loop(){
     if(t>=AXIS.tMax){
       $("status").textContent = $("inclInsp").checked ? "Inspiración…" : "Maniobra completa";
       if($("inclInsp").checked){ phase='insp'; tInsp=0; }
-      else { running=false; updateUI(); }
+      else { running=false; placeFEFLabels=true; updateUI(); }
     }
   } else {
     tInsp = Math.min(tInsp + dt, INSP_TOTAL);
-    const s = tInsp/INSP_TOTAL;                 // 0→1
+    const s = tInsp/INSP_TOTAL;                 
     const vol = (vtPoints.length? vtPoints[vtPoints.length-1].v : current.FVC) * (1 - s);
-    const flow = current.PIF * Math.sin(Math.PI * s); // negativo
+    const flow = current.PIF * Math.sin(Math.PI * s); 
     fvPoints.push({ vol, flow });
 
-    if(tInsp>=INSP_TOTAL){ running=false; $("status").textContent="Lazo completo (espira+inspira)"; updateUI(); }
+    if(tInsp>=INSP_TOTAL){ running=false; placeFEFLabels=true; $("status").textContent="Lazo completo (espira+inspira)"; updateUI(); }
   }
 
   drawAll();
@@ -511,50 +537,81 @@ function preparePattern(){
   if(!dur || dur<3 || dur>15){ dur=current.tMaxAuto; $("duracion").value=dur.toFixed(1); }
   AXIS.tMax = clamp(dur,3,15);
   $("axisHint").textContent=`Intervalo: 0–${AXIS.tMax}s · Volumen 0–${AXIS.vMax} L · Flujo ${AXIS.flowMin} a ${AXIS.flowMax} L/s`;
-  t=0; lastV=0; lastT=0; phase='exp'; tInsp=0; resetBuffers(); drawAll(); updateUI();
+  t=0; lastV=0; lastT=0; phase='exp'; tInsp=0; placeFEFLabels=false; resetBuffers(); drawAll(); updateUI();
 }
 
-/* ===== Controles ===== */
-$("startBtn").addEventListener("click", ()=>{ if(!running){ if(t===0 && phase==='exp'){ resetBuffers(); lastV=0; lastT=0; } running=true; $("status").textContent="Grabando…"; requestAnimationFrame(loop); } });
-$("pauseBtn").addEventListener("click", ()=>{ running=false; $("status").textContent="Pausado"; updateUI(); });
-function hardReset(){ running=false; t=0; lastV=0; lastT=0; tInsp=0; phase='exp'; resetBuffers(); $("status").textContent="Listo"; drawAll(); updateUI(); }
-$("resetBtn").addEventListener("click", hardReset);
-
-$("saveBtn").addEventListener("click", ()=>{
+/* ===== Controles (panel y barra flotante) ===== */
+function start(){ if(!running){ if(t===0 && phase==='exp'){ resetBuffers(); lastV=0; lastT=0; } running=true; $("status").textContent="Grabando…"; placeFEFLabels=false; requestAnimationFrame(loop); } }
+function pause(){ running=false; $("status").textContent="Pausado"; updateUI(); }
+function hardReset(){ running=false; t=0; lastV=0; lastT=0; tInsp=0; phase='exp'; placeFEFLabels=false; resetBuffers(); $("status").textContent="Listo"; drawAll(); updateUI(); }
+function saveAttempt(){
   if(vtPoints.length<10){ alert("Hacé la maniobra antes de guardar."); return; }
-  const m = computeMetricsLive();
-  const acc = acceptabilityFlags();
+  const m = computeMetricsLive(); const acc = acceptabilityFlags();
   const snapshot = { vt:vtPoints.slice(), fv:fvPoints.slice(), metrics:m, acc };
   if(attempts[mode].length>=3) attempts[mode].shift();
   attempts[mode].push(snapshot);
   $("status").textContent = `Guardado intento ${attempts[mode].length} (${mode.toUpperCase()})`;
   updateUI();
-});
+}
+
+$("startBtn").addEventListener("click", start);
+$("dockStart").addEventListener("click", start);
+$("pauseBtn").addEventListener("click", pause);
+$("dockPause").addEventListener("click", pause);
+$("resetBtn").addEventListener("click", hardReset);
+$("dockReset").addEventListener("click", hardReset);
+$("saveBtn").addEventListener("click", saveAttempt);
+$("dockSave").addEventListener("click", saveAttempt);
 
 $("pattern").addEventListener("change", preparePattern);
 $("severity").addEventListener("input", preparePattern);
-$("duracion").addEventListener("change", ()=>{ AXIS.tMax=clamp(parseFloat($("duracion").value)||6,3,15); t=0; lastV=0; lastT=0; phase='exp'; tInsp=0; resetBuffers(); drawAll(); updateUI(); });
+$("duracion").addEventListener("change", ()=>{ AXIS.tMax=clamp(parseFloat($("duracion").value)||6,3,15); t=0; lastV=0; lastT=0; phase='exp'; tInsp=0; placeFEFLabels=false; resetBuffers(); drawAll(); updateUI(); });
 ["sexo","edad","talla"].forEach(id=> $(id).addEventListener("change", updateUI));
 
 $("showTheo").addEventListener("change", ()=>{ $("theoLegend").style.display=$("showTheo").checked?"inline-block":"none"; $("theoTxt").style.display=$("showTheo").checked?"inline":"none"; drawAll(); });
+$("inclInsp").addEventListener("change", ()=> drawAll());
 
+/* Tabs Pre/Post */
 $("tabPre").addEventListener("click", ()=>{ mode='pre'; $("tabPre").classList.add("active"); $("tabPost").classList.remove("active"); hardReset(); });
 $("tabPost").addEventListener("click", ()=>{ mode='post'; $("tabPost").classList.add("active"); $("tabPre").classList.remove("active"); hardReset(); });
 
+/* Ocultar panel: ahora expande la grilla a ancho completo */
 $("togglePanelBtn").addEventListener("click", ()=>{
-  const panel=$("panel"); const nowHidden=panel.classList.toggle("hidden");
+  const panel=$("panel"); const app=$("app");
+  const nowHidden=panel.classList.toggle("hidden");
   $("togglePanelBtn").textContent=nowHidden?"Mostrar":"Ocultar";
   $("floatToggle").classList.toggle("hidden", !nowHidden);
+  app.classList.toggle("wide", nowHidden);
+  drawAll();
 });
-$("floatToggle").addEventListener("click", ()=>{ $("panel").classList.remove("hidden"); $("floatToggle").classList.add("hidden"); $("togglePanelBtn").textContent="Ocultar"; });
+$("floatToggle").addEventListener("click", ()=>{
+  $("panel").classList.remove("hidden");
+  $("app").classList.remove("wide");
+  $("floatToggle").classList.add("hidden");
+  $("togglePanelBtn").textContent="Ocultar";
+  drawAll();
+});
 
-$("fsBtn").addEventListener("click", ()=>{ const el=$("app"); if(!document.fullscreenElement){ el.requestFullscreen?.(); } else { document.exitFullscreen?.(); }});
+/* Barra flotante: FS, PDF, Parámetros */
+function toggleFS(){
+  const el=$("app");
+  if(!document.fullscreenElement){ el.requestFullscreen?.(); }
+  else { document.exitFullscreen?.(); }
+}
+$("fsBtn").addEventListener("click", toggleFS);
+$("dockFS").addEventListener("click", toggleFS);
 document.addEventListener("fullscreenchange", ()=> drawAll());
+$("dockPDF").addEventListener("click", ()=> $("pdfBtn").click());
+$("dockParams").addEventListener("click", ()=>{
+  const hidden = $("panel").classList.contains("hidden");
+  if(hidden){ $("floatToggle").click(); } else { $("togglePanelBtn").click(); }
+});
 
+/* Init */
 window.addEventListener("resize", ()=> drawAll());
 preparePattern(); updateUI();
 
-/* ===== Export PDF (1 hoja, puntos reales) ===== */
+/* ===== Export PDF (1 hoja, puntos reales + etiquetas FEF) ===== */
 $("pdfBtn").addEventListener("click", ()=>{
   const nombre=$("nombre").value||"—", idpac=$("idpac").value||"—";
   const patron=PATTERNS[$("pattern").value].label, sev=$("severity").value;
@@ -563,7 +620,7 @@ $("pdfBtn").addEventListener("click", ()=>{
   const bestPre  = summarizeAttempts(attempts.pre);
   const bestPost = summarizeAttempts(attempts.post);
   const respBD = bronchoResponse(bestPre, bestPost);
-  const vtImg = renderVTimage(vtPoints), fvImg = renderFVimage(fvPoints);
+  const vtImg = renderVTimage(vtPoints), fvImg = renderFVimage(fvPoints, /*withLabels*/true);
 
   const now=new Date(); const fecha=now.toLocaleDateString(); const hora=now.toLocaleTimeString();
 
@@ -645,7 +702,7 @@ $("pdfBtn").addEventListener("click", ()=>{
   </div>
 
   <div class="foot">
-    <div>Equipo simulado: Web-Spiro v2.2 · Lazo F-V con ascenso vertical 0→PEF · Módulo GLI aprox (docente)</div>
+    <div>Equipo simulado: Web-Spiro v2.3 · Lazo F-V con inspiración teórica visible · Módulo GLI aprox (docente)</div>
     <div>Firma: ____________________________</div>
   </div>
   `;
@@ -675,12 +732,12 @@ function summarizeAttempts(list){
 }
 function interpText(best, ref){
   if(!(best.FEV1>0 && best.FVC>0)) return "Sin intentos válidos para interpretar.";
-  const m = { FEV1:best.FEV1, FVC:best.FVC, RATIO:100*(best.FEV1/best.FVC) };
+  const m = { FEV1:best.FEV1, FVC:bestFVC, RATIO:100*(best.FEV1/best.FVC) };
   const I = interpret(m, ref);
   return `Patrón: <b>${I.label}</b> — %FEV1 pred: <b>${Math.round(I.fev1pp)}%</b> (${I.sev}). Ratio vs LLN: <b>${Math.round(100*(m.FEV1/m.FVC))}%</b> vs <b>${Math.round(100*ref.llnRatio)}%</b>.`;
 }
 
-/* ===== Render imágenes HD desde puntos ===== */
+/* ===== Render imágenes HD desde puntos (con etiquetas FEF en PDF) ===== */
 function makeOffscreen(w=1280,h=880){ const c=document.createElement("canvas"); c.width=w; c.height=h; return c; }
 function drawGridRaw(ctx, kind, w, h){
   ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h);
@@ -707,7 +764,12 @@ function renderVTimage(points=vtPoints){
 function renderFVimage(points=fvPoints){
   const off=makeOffscreen(), ctx=off.getContext("2d"); drawGridRaw(ctx,"fv",off.width,off.height);
   const FVC = vtPoints.length? vtPoints[vtPoints.length-1].v : current.FVC;
-  [0.25,0.50,0.75].forEach(p=>{ const [x,_]=fvPxRaw(off.width,off.height,p*FVC,0); ctx.strokeStyle="#cfd8dc"; ctx.setLineDash([6,6]); ctx.beginPath(); ctx.moveTo(x,10); ctx.lineTo(x,off.height-10); ctx.stroke(); ctx.setLineDash([]); });
+  // Marcas y etiquetas
+  [0.25,0.50,0.75].forEach((p,idx)=>{
+    const [x,_]=fvPxRaw(off.width,off.height,p*FVC,0);
+    ctx.strokeStyle="#cfd8dc"; ctx.setLineDash([6,6]); ctx.beginPath(); ctx.moveTo(x,10); ctx.lineTo(x,off.height-10); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle="#4b5c66"; ctx.font="16px system-ui"; const label = idx===0?"FEF 25%": idx===1?"FEF 50%":"FEF 75%"; ctx.fillText(label, x+6, 24);
+  });
   if(points.length){ ctx.beginPath(); points.forEach((p,i)=>{ const [x,y]=fvPxRaw(off.width,off.height,p.vol,p.flow); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }); ctx.strokeStyle="#005257"; ctx.lineWidth=4; ctx.stroke(); }
   return off.toDataURL("image/png");
 }
