@@ -217,10 +217,10 @@ const fmt = (x, d=2)=> (isFinite(x)? (+x).toFixed(d) : "—");
 function lerp(a,b,t){ return a+(b-a)*t; }
 function esc(s){ return String(s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m])); }
 
-/* ===== Ejes dinámicos ===== */
+/* ===== Ejes ===== */
 let AXIS = { tMax:6, vMax:6, flowMin:-6, flowMax:12 };
 
-/* ===== Patrones (base) con PIF ===== */
+/* ===== Patrones con PIF ===== */
 const PATTERNS = {
   normal:     { label:"Normal",       FVC:4.8, k:2.6,  PEF:9.0,  concavity:0.15, midFlow:3.5,  tMaxBase:6.0,  PIF:-4.5 },
   asma:       { label:"Asma",         FVC:4.6, k:1.2,  PEF:6.5,  concavity:0.45, midFlow:2.2,  tMaxBase:8.0,  PIF:-3.8 },
@@ -237,12 +237,20 @@ function applySeverity(base, sev){
   const concavity = lerp(base.concavity, base.concavity*1.15 + 0.1*s, 0.8);
   const midFlow = base.midFlow * lerp(1.0, 0.55, s);
   const tMaxAuto = base.tMaxBase * lerp(1.0, 1.6, s);
-  const PIF = base.PIF * lerp(1.0, 0.7, s); // menos intenso con severidad
+  const PIF = base.PIF * lerp(1.0, 0.7, s);
   return {FVC,k,PEF,concavity,midFlow,tMaxAuto,PIF};
 }
 
 /* ===== Modelo ===== */
 function volumeAt(t, FVC, k){ t = clamp(t,0,AXIS.tMax); return FVC * (1 - Math.exp(-k * t)); }
+
+/* Flujo espiratorio como función del fracción de volumen espirado (x=V/FVC).
+   Esto da PEF muy temprano y luego caída concava, y permite un ascenso vertical desde 0,0. */
+function flowExpFromFrac(x, PEF, concavity){
+  x = clamp(x,0,1);
+  const decay = Math.exp(-3*x) * (1 - concavity*x) + (concavity*0.15*Math.pow(1-x,2));
+  return Math.max(0, PEF * clamp(decay, 0, 1));
+}
 
 /* ===== GLI aprox docente ===== */
 function gliApprox({sexo, edad, tallaCm}){
@@ -285,8 +293,8 @@ function fvToPx(ctx, vol, flow){
 /* ===== Estado, buffers e intentos ===== */
 let running=false, t=0, current={}, theoFV=[];
 let mode='pre'; // 'pre' | 'post'
-const vtPoints=[]; // puntos del intento en curso (solo espiración)
-const fvPoints=[]; // puntos del lazo completo (esp + opc insp)
+const vtPoints=[]; // (solo espiración)
+const fvPoints=[]; // lazo completo (esp + opc insp)
 const attempts = { pre:[], post:[] };
 
 /* Fases del lazo */
@@ -377,34 +385,29 @@ function drawVTfromPoints(ctx){
 function drawFVfromPoints(ctx){
   drawGrid(ctx,"fv"); ctx.save(); ctx.scale(dpr,dpr);
 
-  // Líneas FEF 25/50/75 (verticales sobre volumen)
-  const vols = [0.25,0.50,0.75].map(p=>p*(vtPoints.length? vtPoints[vtPoints.length-1].v : current.FVC));
+  // Marcas FEF 25/50/75
+  const FVC = vtPoints.length? vtPoints[vtPoints.length-1].v : current.FVC;
+  const vols = [0.25,0.50,0.75].map(p=>p*FVC);
   ctx.strokeStyle="#cfd8dc"; ctx.lineWidth=1; ctx.setLineDash([4,4]);
-  vols.forEach(v=>{
-    const [x,_]=fvToPx(ctx,v,0); ctx.beginPath(); ctx.moveTo(x,10); ctx.lineTo(x,ctx.canvas.height/dpr-10); ctx.stroke();
-  });
+  vols.forEach(v=>{ const [x,_]=fvToPx(ctx,v,0); ctx.beginPath(); ctx.moveTo(x,10); ctx.lineTo(x,ctx.canvas.height/dpr-10); ctx.stroke(); });
   ctx.setLineDash([]);
 
-  // Curva teórica (esp y opcional insp)
+  // Curvas teóricas
   if($("showTheo").checked){
-    // Espiración teórica
+    // Espiratoria
     ctx.beginPath(); const N=220;
     for(let i=0;i<=N;i++){ const x=i/N; const vol=current.FVC*x;
-      const decay=Math.exp(-3*x)*(1-current.concavity*x)+(current.concavity*0.15*Math.pow(1-x,2));
-      const flow=Math.max(0, current.PEF*clamp(decay,0,1)); const [px,py]=fvToPx(ctx,vol,flow);
-      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
+      const flow=flowExpFromFrac(x, current.PEF, current.concavity);
+      const [px,py]=fvToPx(ctx,vol,flow); if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
     ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
     ctx.lineWidth=2; ctx.globalAlpha=.45; ctx.stroke(); ctx.globalAlpha=1;
 
-    // Inspiración teórica (simétrica suave)
+    // Inspiratoria
     if($("inclInsp").checked){
       ctx.beginPath();
-      for(let i=0;i<=N;i++){
-        const s=i/N; const vol=current.FVC*(1-s);
+      for(let i=0;i<=N;i++){ const s=i/N; const vol=current.FVC*(1-s);
         const flow=current.PIF*Math.sin(Math.PI*s);
-        const [px,py]=fvToPx(ctx,vol,flow);
-        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-      }
+        const [px,py]=fvToPx(ctx,vol,flow); if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
       ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
       ctx.lineWidth=2; ctx.globalAlpha=.30; ctx.stroke(); ctx.globalAlpha=1;
     }
@@ -417,8 +420,8 @@ function drawFVfromPoints(ctx){
     ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
     ctx.lineWidth=2.6; ctx.stroke();
 
-    // Flecha de dirección en rama espiratoria (entre primer y décimo punto)
-    const idx2 = Math.min(10, fvPoints.length-1);
+    // Flecha de dirección al comienzo (0→PEF)
+    const idx2 = Math.min(8, fvPoints.length-1);
     const p1 = fvPoints[0], p2 = fvPoints[idx2];
     const [x1,y1]=fvToPx(ctx,p1.vol,p1.flow), [x2,y2]=fvToPx(ctx,p2.vol,p2.flow);
     ctx.strokeStyle="#455a64"; drawArrow(ctx,x1,y1,x2,y2);
@@ -438,13 +441,18 @@ function loop(){
     const speedFactor = 0.55 + 1.2*Math.exp(-3.2*progress);
     const step = dt*speedFactor;
 
+    // Al iniciar, fuerza el punto (0,0) para la subida vertical inicial
+    if(t===0 && fvPoints.length===0){ fvPoints.push({vol:0, flow:0}); }
+
     t = clamp(t+step, 0, AXIS.tMax);
     const v = volumeAt(t, current.FVC, current.k);
+    const xFrac = v / current.FVC;
+    const flow = flowExpFromFrac(xFrac, current.PEF, current.concavity); // flujo analítico (no derivada numérica)
 
+    // Guardar puntos
     vtPoints.push({t, v});
-    const dV = v-lastV, dT = Math.max(1e-3, t-lastT);
-    let flow = dV/dT; if(flow<0) flow=0; // solo espiración
     fvPoints.push({vol:v, flow});
+
     lastV=v; lastT=t;
 
     if(t>=AXIS.tMax){
@@ -637,7 +645,7 @@ $("pdfBtn").addEventListener("click", ()=>{
   </div>
 
   <div class="foot">
-    <div>Equipo simulado: Web-Spiro v2.1 · Lazo F-V con inspiración · Módulo GLI aprox (docente)</div>
+    <div>Equipo simulado: Web-Spiro v2.2 · Lazo F-V con ascenso vertical 0→PEF · Módulo GLI aprox (docente)</div>
     <div>Firma: ____________________________</div>
   </div>
   `;
@@ -698,7 +706,6 @@ function renderVTimage(points=vtPoints){
 }
 function renderFVimage(points=fvPoints){
   const off=makeOffscreen(), ctx=off.getContext("2d"); drawGridRaw(ctx,"fv",off.width,off.height);
-  // Marcas FEF
   const FVC = vtPoints.length? vtPoints[vtPoints.length-1].v : current.FVC;
   [0.25,0.50,0.75].forEach(p=>{ const [x,_]=fvPxRaw(off.width,off.height,p*FVC,0); ctx.strokeStyle="#cfd8dc"; ctx.setLineDash([6,6]); ctx.beginPath(); ctx.moveTo(x,10); ctx.lineTo(x,off.height-10); ctx.stroke(); ctx.setLineDash([]); });
   if(points.length){ ctx.beginPath(); points.forEach((p,i)=>{ const [x,y]=fvPxRaw(off.width,off.height,p.vol,p.flow); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }); ctx.strokeStyle="#005257"; ctx.lineWidth=4; ctx.stroke(); }
