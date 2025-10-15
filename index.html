@@ -62,6 +62,12 @@
   .control-dock .ghost{ background:#fff; }
   .control-dock .sep{ width:1px; background:var(--grid); margin:0 2px; }
 
+  /* Tabs: subir especificidad para asegurar color activo */
+  .tabs{ display:flex; gap:6px; }
+  .tabs button{ background:#e9f3f2; color:var(--accent); }
+  .tabs button.active,
+  .tabs button.active:focus{ background:var(--accent) !important; color:#fff !important; }
+
   @media print{
     @page{ size:A4; margin:10mm; }
     body{ background:#fff; }
@@ -153,7 +159,7 @@
           </div>
         </div>
 
-        <!-- Botonera de la izquierda (opcional, la barra flotante ya controla todo) -->
+        <!-- Botonera lateral (la barra flotante ya controla todo) -->
         <div class="btns">
           <button id="startBtn">Inicio</button>
           <button id="pauseBtn" class="warn">Pausa</button>
@@ -306,7 +312,7 @@ function fvToPx(ctx, vol, flow){
 }
 
 /* ===== Estado, buffers e intentos ===== */
-let running=false, t=0, current={}, theoFV=[];
+let running=false, t=0, current={}, placeFEFLabels=false;
 let mode='pre'; // 'pre' | 'post'
 const vtPoints=[]; // (solo espiración)
 const fvPoints=[]; // lazo completo (esp + opc insp)
@@ -378,15 +384,20 @@ function drawArrow(ctx, x1,y1, x2,y2){
   ctx.lineTo(x2-len*Math.cos(ang+a), y2-len*Math.sin(ang+a));
   ctx.stroke();
 }
-let placeFEFLabels=false; // se activa cuando termina el intento
 function drawFEFLabels(ctx, FVC){
   if(!placeFEFLabels) return;
   const labels=["FEF 25%","FEF 50%","FEF 75%"];
   [0.25,0.50,0.75].forEach((p,idx)=>{
-    const [x,y0]=fvToPx(ctx,p*FVC,0);
+    const [x,_y0]=fvToPx(ctx,p*FVC,0);
     ctx.fillStyle="#4b5c66"; ctx.font="12px system-ui";
-    ctx.fillText(labels[idx], x+4, 16); // arriba de la línea
+    ctx.fillText(labels[idx], x+4, 16);
   });
+}
+
+/* Mejor intento de una lista (por FEV1) */
+function bestAttempt(list){
+  if(!list.length) return null;
+  return list.reduce((best,it)=> (it.metrics.FEV1>(best?.metrics?.FEV1||-1)? it:best), null);
 }
 
 function drawVTfromPoints(ctx){
@@ -403,11 +414,10 @@ function drawVTfromPoints(ctx){
     vtPoints.forEach((p,i)=>{ const [x,y]=vtToPx(ctx, p.t, p.v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
     ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
     ctx.lineWidth=2.6; ctx.stroke();
-    const last=vtPoints[vtPoints.length-1]; const [cx,cy]=vtToPx(ctx,last.t,last.v);
-    ctx.fillStyle="#111"; ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2); ctx.fill();
   }
   ctx.restore();
 }
+
 function drawFVfromPoints(ctx){
   drawGrid(ctx,"fv"); ctx.save(); ctx.scale(dpr,dpr);
 
@@ -420,7 +430,7 @@ function drawFVfromPoints(ctx){
   ctx.setLineDash([]);
   drawFEFLabels(ctx, FVC);
 
-  // Curvas teóricas (incluye inspiración si está marcada)
+  // Curvas teóricas
   if($("showTheo").checked){
     // Espiratoria
     ctx.beginPath(); const N=220;
@@ -430,7 +440,7 @@ function drawFVfromPoints(ctx){
     ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
     ctx.lineWidth=2; ctx.globalAlpha=.50; ctx.stroke(); ctx.globalAlpha=1;
 
-    // Inspiratoria teórica visible si corresponde
+    // Inspiratoria teórica
     if($("inclInsp").checked){
       ctx.beginPath();
       for(let i=0;i<=N;i++){ const s=i/N; const vol=current.FVC*(1-s);
@@ -441,14 +451,23 @@ function drawFVfromPoints(ctx){
     }
   }
 
-  // Curva real
+  /* Superposición PRE/POST: mostrar el mejor del otro modo en verde agua */
+  const other = (mode==='pre')? bestAttempt(attempts.post) : bestAttempt(attempts.pre);
+  if(other && other.fv && other.fv.length){
+    ctx.beginPath();
+    other.fv.forEach((p,i)=>{ const [x,y]=fvToPx(ctx, p.vol, p.flow); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
+    ctx.lineWidth=2.6; ctx.globalAlpha=.65; ctx.stroke(); ctx.globalAlpha=1;
+  }
+
+  // Curva actual
   if(fvPoints.length){
     ctx.beginPath();
     fvPoints.forEach((p,i)=>{ const [x,y]=fvToPx(ctx, p.vol, p.flow); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
     ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
     ctx.lineWidth=2.6; ctx.stroke();
 
-    // Flecha de dirección al comienzo (0→PEF)
+    // Flecha de dirección (0→PEF)
     const idx2 = Math.min(8, fvPoints.length-1);
     const p1 = fvPoints[0], p2 = fvPoints[idx2];
     const [x1,y1]=fvToPx(ctx,p1.vol,p1.flow), [x2,y2]=fvToPx(ctx,p2.vol,p2.flow);
@@ -563,6 +582,16 @@ $("dockReset").addEventListener("click", hardReset);
 $("saveBtn").addEventListener("click", saveAttempt);
 $("dockSave").addEventListener("click", saveAttempt);
 
+/* Tabs Pre/Post: aseguramos clases activas */
+function setMode(newMode){
+  mode=newMode;
+  $("tabPre").classList.toggle("active", mode==='pre');
+  $("tabPost").classList.toggle("active", mode==='post');
+  hardReset();
+}
+$("tabPre").addEventListener("click", ()=> setMode('pre'));
+$("tabPost").addEventListener("click", ()=> setMode('post'));
+
 $("pattern").addEventListener("change", preparePattern);
 $("severity").addEventListener("input", preparePattern);
 $("duracion").addEventListener("change", ()=>{ AXIS.tMax=clamp(parseFloat($("duracion").value)||6,3,15); t=0; lastV=0; lastT=0; phase='exp'; tInsp=0; placeFEFLabels=false; resetBuffers(); drawAll(); updateUI(); });
@@ -570,10 +599,6 @@ $("duracion").addEventListener("change", ()=>{ AXIS.tMax=clamp(parseFloat($("dur
 
 $("showTheo").addEventListener("change", ()=>{ $("theoLegend").style.display=$("showTheo").checked?"inline-block":"none"; $("theoTxt").style.display=$("showTheo").checked?"inline":"none"; drawAll(); });
 $("inclInsp").addEventListener("change", ()=> drawAll());
-
-/* Tabs Pre/Post */
-$("tabPre").addEventListener("click", ()=>{ mode='pre'; $("tabPre").classList.add("active"); $("tabPost").classList.remove("active"); hardReset(); });
-$("tabPost").addEventListener("click", ()=>{ mode='post'; $("tabPost").classList.add("active"); $("tabPre").classList.remove("active"); hardReset(); });
 
 /* Ocultar panel: ahora expande la grilla a ancho completo */
 $("togglePanelBtn").addEventListener("click", ()=>{
@@ -607,22 +632,34 @@ $("dockParams").addEventListener("click", ()=>{
   if(hidden){ $("floatToggle").click(); } else { $("togglePanelBtn").click(); }
 });
 
-/* Init */
 window.addEventListener("resize", ()=> drawAll());
 preparePattern(); updateUI();
 
-/* ===== Export PDF (1 hoja, puntos reales + etiquetas FEF) ===== */
+/* ===== Export PDF (1 hoja) con fallback si bloquean pop-ups ===== */
 $("pdfBtn").addEventListener("click", ()=>{
   const nombre=$("nombre").value||"—", idpac=$("idpac").value||"—";
   const patron=PATTERNS[$("pattern").value].label, sev=$("severity").value;
   const sexo=$("sexo").value, edad=+$("edad").value, talla=+$("talla").value;
   const ref = gliRef();
-  const bestPre  = summarizeAttempts(attempts.pre);
-  const bestPost = summarizeAttempts(attempts.post);
+  const bestPreA  = bestAttempt(attempts.pre)  || {metrics:{FEV1:0,FVC:0}};
+  const bestPostA = bestAttempt(attempts.post) || {metrics:{FEV1:0,FVC:0}};
+  const bestPre  = {FEV1: +bestPreA.metrics.FEV1||0, FVC:+bestPreA.metrics.FVC||0};
+  const bestPost = {FEV1: +bestPostA.metrics.FEV1||0, FVC:+bestPostA.metrics.FVC||0};
   const respBD = bronchoResponse(bestPre, bestPost);
-  const vtImg = renderVTimage(vtPoints), fvImg = renderFVimage(fvPoints, /*withLabels*/true);
+
+  // imágenes: actual + overlay si existe "el otro"
+  const vtImg = renderVTimage(vtPoints);
+  const fvImg = renderFVimage(fvPoints, true); // true = incluir etiquetas FEF
+  const overlayOther = (mode==='pre')? bestPostA?.fv : bestPreA?.fv;
+  const fvOverlayImg = overlayOther && overlayOther.length ? renderFVimage(overlayOther, true, /*isOverlay*/true) : null;
 
   const now=new Date(); const fecha=now.toLocaleDateString(); const hora=now.toLocaleTimeString();
+
+  const overlayHTML = fvOverlayImg ? `<div class="box"><h3>Flujo — Volumen (superposición PRE/POST)</h3>
+    <div style="position:relative;">
+      <img class="img" src="${fvOverlayImg}" alt="FV overlay" />
+      <img class="img" src="${fvImg}" alt="FV actual" style="position:absolute;left:0;top:0;opacity:.7"/>
+    </div></div>` : "";
 
   const report = `
   <style>
@@ -665,6 +702,8 @@ $("pdfBtn").addEventListener("click", ()=>{
     </div>
   </div>
 
+  ${overlayHTML}
+
   <div class="box" style="margin-top:10px;">
     <h3>Métricas y Referencia (GLI aprox.)</h3>
     <table>
@@ -702,21 +741,33 @@ $("pdfBtn").addEventListener("click", ()=>{
   </div>
 
   <div class="foot">
-    <div>Equipo simulado: Web-Spiro v2.3 · Lazo F-V con inspiración teórica visible · Módulo GLI aprox (docente)</div>
+    <div>Equipo simulado: Web-Spiro v2.4 · Superposición PRE/POST · FEF etiquetado · GLI aprox (docente)</div>
     <div>Firma: ____________________________</div>
   </div>
   `;
 
-  const w=window.open("","_blank"); if(!w){ alert("Habilitá pop-ups para exportar."); return; }
-  w.document.open(); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Informe de Espirometría</title></head><body>${report}</body></html>`); w.document.close();
-  w.onload=()=> setTimeout(()=> w.print(), 250);
+  // Pop-up estándar
+  let w=window.open("","_blank");
+  if(w){
+    w.document.open(); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Informe de Espirometría</title></head><body>${report}</body></html>`); w.document.close();
+    w.onload=()=> setTimeout(()=> w.print(), 250);
+  }else{
+    // Fallback: iframe oculto (por si el navegador bloquea pop-ups)
+    const iframe=document.createElement('iframe');
+    iframe.style.position='fixed'; iframe.style.right='0'; iframe.style.bottom='0'; iframe.style.width='0'; iframe.style.height='0'; iframe.style.border='0';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow.document;
+    doc.open(); doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>Informe de Espirometría</title></head><body>${report}</body></html>`); doc.close();
+    setTimeout(()=> iframe.contentWindow.focus() || iframe.contentWindow.print(), 300);
+  }
 });
 
-function pct(x){ return isFinite(x)? Math.round(100*x)+"%" : "—"; }
+function pct(x){ return (x>0 && isFinite(x))? Math.round(100*x)+"%" : "—"; }
 function countAcceptable(list){ return list.filter(it=> it.acc && it.acc.bevOK && it.acc.timeOK && it.acc.plateauOK).length; }
 function repStr(list){ const r=reproducibilityFlags(list); return (r.repFEV1&&r.repFVC)? "Cumple (ΔFEV1 "+fmt(r.dfFEV1)+" L, ΔFVC "+fmt(r.dfFVC)+" L)" : "No cumple (ΔFEV1 "+fmt(r.dfFEV1)+" L, ΔFVC "+fmt(r.dfFVC)+" L)"; }
 function deltaStr(a,b){ if(!(a>0 && b>0)) return "—"; const abs=b-a; const rel=(abs/a)*100; return `${fmt(abs)} L (${Math.round(rel)}%)`; }
 function bronchoResponse(pre, post){
+  if(!(pre.FEV1>0 && post.FEV1>0)) return {ok:false, explain:"(Faltan intentos válidos PRE/POST)."};
   const fev1Abs=post.FEV1-pre.FEV1, fvcAbs=post.FVC-pre.FVC;
   const fev1Rel=(fev1Abs/pre.FEV1)*100, fvcRel=(fvcAbs/pre.FVC)*100;
   const fevOK=(fev1Abs>=0.200 && fev1Rel>=12), fvcOK=(fvcAbs>=0.200 && fvcRel>=12);
@@ -730,14 +781,8 @@ function summarizeAttempts(list){
   const bestFVC  = list.reduce((m,it)=> it.metrics.FVC>m? it.metrics.FVC:m, 0);
   return {FEV1:bestFEV1, FVC:bestFVC};
 }
-function interpText(best, ref){
-  if(!(best.FEV1>0 && best.FVC>0)) return "Sin intentos válidos para interpretar.";
-  const m = { FEV1:best.FEV1, FVC:bestFVC, RATIO:100*(best.FEV1/best.FVC) };
-  const I = interpret(m, ref);
-  return `Patrón: <b>${I.label}</b> — %FEV1 pred: <b>${Math.round(I.fev1pp)}%</b> (${I.sev}). Ratio vs LLN: <b>${Math.round(100*(m.FEV1/m.FVC))}%</b> vs <b>${Math.round(100*ref.llnRatio)}%</b>.`;
-}
 
-/* ===== Render imágenes HD desde puntos (con etiquetas FEF en PDF) ===== */
+/* ===== Render imágenes HD desde puntos (con etiquetas FEF) ===== */
 function makeOffscreen(w=1280,h=880){ const c=document.createElement("canvas"); c.width=w; c.height=h; return c; }
 function drawGridRaw(ctx, kind, w, h){
   ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h);
@@ -755,22 +800,24 @@ function fvPxRaw(w,h,vol,flow){
   const y=h/2 - ((flow - (AXIS.flowMin+AXIS.flowMax)/2)/(AXIS.flowMax-AXIS.flowMin))*(h-36);
   return [x,y];
 }
-function renderVTimage(points=vtPoints){
+function renderVTimage(points){
   const off=makeOffscreen(), ctx=off.getContext("2d"); drawGridRaw(ctx,"vt",off.width,off.height);
-  if(points.length){ ctx.beginPath(); points.forEach((p,i)=>{ const [x,y]=vtPxRaw(off.width,off.height,p.t,p.v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  if(points && points.length){ ctx.beginPath(); points.forEach((p,i)=>{ const [x,y]=vtPxRaw(off.width,off.height,p.t,p.v); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
     ctx.strokeStyle="#005257"; ctx.lineWidth=4; ctx.stroke(); }
   return off.toDataURL("image/png");
 }
-function renderFVimage(points=fvPoints){
+function renderFVimage(points, withLabels=false, isOverlay=false){
   const off=makeOffscreen(), ctx=off.getContext("2d"); drawGridRaw(ctx,"fv",off.width,off.height);
   const FVC = vtPoints.length? vtPoints[vtPoints.length-1].v : current.FVC;
-  // Marcas y etiquetas
   [0.25,0.50,0.75].forEach((p,idx)=>{
     const [x,_]=fvPxRaw(off.width,off.height,p*FVC,0);
     ctx.strokeStyle="#cfd8dc"; ctx.setLineDash([6,6]); ctx.beginPath(); ctx.moveTo(x,10); ctx.lineTo(x,off.height-10); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle="#4b5c66"; ctx.font="16px system-ui"; const label = idx===0?"FEF 25%": idx===1?"FEF 50%":"FEF 75%"; ctx.fillText(label, x+6, 24);
+    if(withLabels){ ctx.fillStyle="#4b5c66"; ctx.font="16px system-ui"; const label = idx===0?"FEF 25%": idx===1?"FEF 50%":"FEF 75%"; ctx.fillText(label, x+6, 24); }
   });
-  if(points.length){ ctx.beginPath(); points.forEach((p,i)=>{ const [x,y]=fvPxRaw(off.width,off.height,p.vol,p.flow); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }); ctx.strokeStyle="#005257"; ctx.lineWidth=4; ctx.stroke(); }
+  if(points && points.length){
+    ctx.beginPath(); points.forEach((p,i)=>{ const [x,y]=fvPxRaw(off.width,off.height,p.vol,p.flow); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.strokeStyle=isOverlay? "#12b8a6" : "#005257"; ctx.lineWidth=4; ctx.globalAlpha=isOverlay?.75:1; ctx.stroke(); ctx.globalAlpha=1;
+  }
   return off.toDataURL("image/png");
 }
 </script>
